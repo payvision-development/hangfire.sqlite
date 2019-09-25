@@ -1,0 +1,11 @@
+﻿BEGIN TRANSACTION;
+
+-- Create the Schema table if not exists
+CREATE TABLE IF NOT EXISTS [Schema](
+	[Version] INTEGER NOT NULL PRIMARY KEY
+);
+
+--SET SCHEMA VERSION
+REPLACE INTO [Schema]([Version]) VALUES (1);
+
+COMMIT TRANSACTION;

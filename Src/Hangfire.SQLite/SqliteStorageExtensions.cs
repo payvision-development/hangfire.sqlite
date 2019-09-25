@@ -89,7 +89,8 @@
                 throw new ArgumentNullException(nameof(options));
             }
 
-            return configuration.UseStorage(new SqliteStorage(options));
+            return configuration.UseStorage(
+                new SqliteStorage(() => new SQLiteConnection(connectionString.ToString()), options));
         }
     }
 }
