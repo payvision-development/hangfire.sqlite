@@ -2,8 +2,56 @@
 
 -- Create the Schema table if not exists
 CREATE TABLE IF NOT EXISTS [Schema](
-	[Version] INTEGER NOT NULL PRIMARY KEY
+    [Version] INTEGER NOT NULL PRIMARY KEY
 );
+
+-- Create Job tables
+CREATE TABLE IF NOT EXISTS [Job] (
+    [Id]				INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    [StateId]			BIGINT,
+    [StateName]			NVARCHAR(20) COLLATE NOCASE,
+    [InvocationData]	TEXT NOT NULL COLLATE NOCASE,
+    [Arguments]			TEXT NOT NULL COLLATE NOCASE,
+    [CreatedAt]			DATETIME NOT NULL,
+    [ExpireAt]			DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS [JobParameter] (
+    [JobId] INTEGER NOT NULL,
+    [Name]  NVARCHAR(40) NOT NULL COLLATE NOCASE,
+    [Value] TEXT COLLATE NOCASE
+,
+    FOREIGN KEY ([JobId])
+        REFERENCES [Job]([Id])
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS [State] (
+    [Id]		INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    [JobId]		INTEGER NOT NULL,
+    [Name]		NVARCHAR(20) NOT NULL COLLATE NOCASE,
+    [Reason]    NVARCHAR(100) COLLATE NOCASE,
+    [CreatedAt] DATETIME NOT NULL,
+    [Data]		TEXT COLLATE NOCASE
+,
+    FOREIGN KEY ([JobId])
+        REFERENCES [Job]([Id])
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+-- Create Job queue table
+CREATE TABLE IF NOT EXISTS [JobQueue] (
+    [Id]		INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    [JobId]		BIGINT NOT NULL,
+    [Queue]		NVARCHAR(50) NOT NULL COLLATE NOCASE,
+    [FetchedAt] DATETIME
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS [PK_HangFire_JobQueue]
+ON [JobQueue]
+([Id] ASC, [Queue] ASC);
 
 --SET SCHEMA VERSION
 REPLACE INTO [Schema]([Version]) VALUES (1);

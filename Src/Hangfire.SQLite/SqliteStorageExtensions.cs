@@ -90,7 +90,7 @@
             }
 
             return configuration.UseStorage(
-                new SqliteStorage(() => new SQLiteConnection(connectionString.ToString()), options));
+                new SqliteStorage(connectionString, options));
         }
     }
 }

@@ -1,5 +1,7 @@
 ﻿namespace Hangfire.Sqlite
 {
+    using System;
+
     /// <summary>
     /// Configuration options for a SQLite storage.
     /// </summary>
@@ -10,5 +12,10 @@
         /// <c>true</c> by default.
         /// </summary>
         public bool PrepareSchemaIfNecessary { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the maximum allowed time to execute a command.
+        /// </summary>
+        public TimeSpan? CommandTimeout { get; set; }
     }
 }
