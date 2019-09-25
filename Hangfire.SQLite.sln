@@ -3,7 +3,25 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29318.209
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hangfire.SQLite", "Src\Hangfire.SQLite\Hangfire.SQLite.csproj", "{78545A8E-E146-4669-B844-3FB78A45BB92}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hangfire.SQLite.Sample", "Test\Hangfire.SQLite.Sample\Hangfire.SQLite.Sample.csproj", "{9818DA6B-D620-4576-830C-4586B9C424F1}"
+EndProject
 Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{78545A8E-E146-4669-B844-3FB78A45BB92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{78545A8E-E146-4669-B844-3FB78A45BB92}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{78545A8E-E146-4669-B844-3FB78A45BB92}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{78545A8E-E146-4669-B844-3FB78A45BB92}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9818DA6B-D620-4576-830C-4586B9C424F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9818DA6B-D620-4576-830C-4586B9C424F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9818DA6B-D620-4576-830C-4586B9C424F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9818DA6B-D620-4576-830C-4586B9C424F1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
