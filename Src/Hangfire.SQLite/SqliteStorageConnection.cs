@@ -8,6 +8,7 @@
 
     using Hangfire.Common;
     using Hangfire.Server;
+    using Hangfire.Sqlite.Concurrency;
     using Hangfire.Sqlite.Db;
     using Hangfire.Sqlite.Entities;
     using Hangfire.Sqlite.Queues;
@@ -16,6 +17,8 @@
     internal sealed class SqliteStorageConnection : IStorageConnection
     {
         private readonly IJobStorage storage;
+
+        private LockedResources lockedResources = new LockedResources();
 
         public SqliteStorageConnection(IJobStorage storage)
         {
@@ -26,7 +29,15 @@
         public IWriteOnlyTransaction CreateWriteTransaction() => new SqliteWriteOnlyTransaction(this.storage);
 
         /// <inheritdoc />
-        public IDisposable AcquireDistributedLock(string resource, TimeSpan timeout) => throw new NotImplementedException();
+        public IDisposable AcquireDistributedLock(string resource, TimeSpan timeout)
+        {
+            if (string.IsNullOrWhiteSpace(resource))
+            {
+                throw new ArgumentNullException(nameof(resource));
+            }
+
+            return this.lockedResources.Lock(resource, timeout);
+        }
 
         /// <inheritdoc />
         public string CreateExpiredJob(
@@ -218,6 +229,13 @@
         /// <inheritdoc />
         public void Dispose()
         {
+            if (this.lockedResources == null)
+            {
+                return;
+            }
+
+            this.lockedResources.Dispose();
+            this.lockedResources = null;
         }
     }
 }
