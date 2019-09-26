@@ -7,6 +7,8 @@
     /// </summary>
     public sealed class SqliteStorageOptions
     {
+        private TimeSpan queuePollInterval = TimeSpan.FromSeconds(15);
+
         /// <summary>
         /// Gets or sets a value indicating whether the schema should be initialized along Hangfire process initialization.
         /// <c>true</c> by default.
@@ -17,5 +19,25 @@
         /// Gets or sets the maximum allowed time to execute a command.
         /// </summary>
         public TimeSpan? CommandTimeout { get; set; }
+
+        /// <summary>
+        /// Gets or sets the time interval to execute a polling to check if new jobs are ready.
+        /// By default is set to 15 seconds.
+        /// </summary>
+        public TimeSpan QueuePollInterval
+        {
+            get => this.queuePollInterval;
+
+            set
+            {
+                if (value != value.Duration())
+                {
+                    throw new ArgumentException(
+                        $"The {nameof(QueuePollInterval)} property value should be positive. Given: {value}.");
+                }
+
+                this.queuePollInterval = value;
+            }
+        }
     }
 }

@@ -10,6 +10,7 @@
     using Hangfire.Server;
     using Hangfire.Sqlite.Db;
     using Hangfire.Sqlite.Entities;
+    using Hangfire.Sqlite.Queues;
     using Hangfire.Storage;
 
     internal sealed class SqliteStorageConnection : IStorageConnection
@@ -83,7 +84,27 @@
         }
 
         /// <inheritdoc />
-        public IFetchedJob FetchNextJob(string[] queues, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public IFetchedJob FetchNextJob(string[] queues, CancellationToken cancellationToken)
+        {
+            if (queues == null || queues.Length == 0)
+            {
+                throw new ArgumentNullException(nameof(queues));
+            }
+
+            IPersistentJobQueueProvider[] providers = queues
+                .Select(queue => this.storage.QueueProviders[queue])
+                .Distinct()
+                .ToArray();
+
+            if (providers.Length != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Multiple provider instances registered for queues: {string.Join(", ", queues)}." +
+                    " Only one type of persistent queue per server instance should be chosen.");
+            }
+
+            return providers[0].JobQueue.Dequeue(this.storage, queues, cancellationToken);
+        }
 
         /// <inheritdoc />
         public void SetJobParameter(string id, string name, string value)
@@ -167,7 +188,17 @@
         }
 
         /// <inheritdoc />
-        public int RemoveTimedOutServers(TimeSpan timeOut) => throw new NotImplementedException();
+        public int RemoveTimedOutServers(TimeSpan timeOut)
+        {
+            if (timeOut.Duration() != timeOut)
+            {
+                throw new ArgumentException($"The `{nameof(timeOut)}`value must be positive.", nameof(timeOut));
+            }
+
+            const string RemoveServerSql = "DELETE FROM [Server] WHERE LastHeartbeat < @timeOutAt";
+
+            return this.storage.Execute(RemoveServerSql, new { timeOutAt = DateTime.UtcNow.Add(timeOut.Negate()) });
+        }
 
         /// <inheritdoc />
         public HashSet<string> GetAllItemsFromSet(string key) => throw new NotImplementedException();

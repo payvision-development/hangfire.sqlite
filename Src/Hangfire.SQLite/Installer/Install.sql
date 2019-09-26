@@ -52,12 +52,16 @@ CREATE TABLE IF NOT EXISTS [JobQueue] (
     [Id]		INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     [JobId]		BIGINT NOT NULL,
     [Queue]		NVARCHAR(50) NOT NULL COLLATE NOCASE,
-    [FetchedAt] DATETIME
+    [FetchedAt] DATETIME,
+    [LockedBy]	TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS [PK_HangFire_JobQueue]
 ON [JobQueue]
 ([Id] ASC, [Queue] ASC);
+CREATE INDEX IF NOT EXISTS [JobQueue_LockedBy]
+ON [JobQueue]
+([LockedBy] DESC);
 
 -- Create Server tables
 CREATE TABLE IF NOT EXISTS [Server] (
@@ -65,6 +69,9 @@ CREATE TABLE IF NOT EXISTS [Server] (
     [Data]			TEXT COLLATE NOCASE,
     [LastHeartbeat]	DATETIME NOT NULL
 );
+CREATE INDEX IF NOT EXISTS [IX_HangFire_Server_LastHeartbeat]
+ON [Server]
+([LastHeartbeat] ASC);
 
 --SET SCHEMA VERSION
 REPLACE INTO [Schema]([Version]) VALUES (1);

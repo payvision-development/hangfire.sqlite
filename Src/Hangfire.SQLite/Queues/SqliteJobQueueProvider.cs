@@ -14,7 +14,7 @@
                 throw new ArgumentNullException(nameof(storage));
             }
 
-            this.JobQueue = new SqliteJobQueue();
+            this.JobQueue = new SqliteJobQueue(storage.Options.QueuePollInterval);
         }
 
         /// <inheritdoc />
