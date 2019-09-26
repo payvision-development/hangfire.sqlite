@@ -9,6 +9,7 @@
     using Hangfire.Common;
     using Hangfire.Server;
     using Hangfire.Sqlite.Db;
+    using Hangfire.Sqlite.Entities;
     using Hangfire.Storage;
 
     internal sealed class SqliteStorageConnection : IStorageConnection
@@ -102,19 +103,67 @@
         /// <inheritdoc />
         public void AnnounceServer(string serverId, ServerContext context)
         {
-            throw new NotImplementedException();
+            if (serverId == null)
+            {
+                throw new ArgumentNullException(nameof(serverId));
+            }
+
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            const string AddServerSql = "REPLACE INTO [Server](Id, Data, LastHeartbeat) VALUES (@id, @data, @heartbeat)";
+
+            var data = new ServerData
+            {
+                WorkerCount = context.WorkerCount,
+                Queues = context.Queues,
+                StartedAt = DateTimeOffset.UtcNow
+            };
+
+            this.storage.Execute(
+                AddServerSql,
+                new
+                {
+                    id = serverId,
+                    data = SerializationHelper.Serialize(data),
+                    heartbeat = data.StartedAt.Value.DateTime
+                });
         }
 
         /// <inheritdoc />
         public void RemoveServer(string serverId)
         {
-            throw new NotImplementedException();
+            if (serverId == null)
+            {
+                throw new ArgumentNullException(nameof(serverId));
+            }
+
+            const string RemoveServerSql = "DELETE FROM [Server] WHERE Id=@id";
+            this.storage.Execute(RemoveServerSql, new { id = serverId });
         }
 
         /// <inheritdoc />
         public void Heartbeat(string serverId)
         {
-            throw new NotImplementedException();
+            if (serverId == null)
+            {
+                throw new ArgumentNullException(nameof(serverId));
+            }
+
+            const string RenovateServerSql = "UPDATE [Server] SET LastHeartbeat=@now WHERE Id=@id";
+            int affected = this.storage.Execute(
+                RenovateServerSql,
+                new
+                {
+                    now = DateTime.UtcNow,
+                    id = serverId
+                });
+            if (affected == 0)
+            {
+                throw new BackgroundServerGoneException();
+            }
         }
 
         /// <inheritdoc />

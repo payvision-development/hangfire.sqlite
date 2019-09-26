@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS [Job] (
     [CreatedAt]			DATETIME NOT NULL,
     [ExpireAt]			DATETIME
 );
+CREATE INDEX IF NOT EXISTS [Job_IX_HangFire_Job_ExpireAt]
+ON [Job]
+([ExpireAt] ASC);
+CREATE INDEX IF NOT EXISTS [IX_HangFire_Job_StateName]
+ON [Job]
+([StateName] ASC);
 
 CREATE TABLE IF NOT EXISTS [JobParameter] (
     [JobId] INTEGER NOT NULL,
@@ -52,6 +58,13 @@ CREATE TABLE IF NOT EXISTS [JobQueue] (
 CREATE UNIQUE INDEX IF NOT EXISTS [PK_HangFire_JobQueue]
 ON [JobQueue]
 ([Id] ASC, [Queue] ASC);
+
+-- Create Server tables
+CREATE TABLE IF NOT EXISTS [Server] (
+    [Id]			NVARCHAR(100) PRIMARY KEY NOT NULL COLLATE NOCASE,
+    [Data]			TEXT COLLATE NOCASE,
+    [LastHeartbeat]	DATETIME NOT NULL
+);
 
 --SET SCHEMA VERSION
 REPLACE INTO [Schema]([Version]) VALUES (1);
