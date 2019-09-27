@@ -57,7 +57,15 @@
         /// <inheritdoc />
         public override void ExpireJob(string jobId, TimeSpan expireIn)
         {
-            throw new NotImplementedException();
+            const string ExpireJobSql = "UPDATE [Job] SET ExpireAt=@expireAt WHERE Id=@id";
+            this.EnqueueCommand(
+                session => session.Execute(
+                    ExpireJobSql,
+                    new
+                    {
+                        id = long.Parse(jobId, CultureInfo.InvariantCulture),
+                        expireAt = DateTime.UtcNow.Add(expireIn)
+                    }));
         }
 
         /// <inheritdoc />
@@ -118,28 +126,16 @@
         }
 
         /// <inheritdoc />
-        public override void IncrementCounter(string key)
-        {
-            throw new NotImplementedException();
-        }
+        public override void IncrementCounter(string key) => this.SetCounter(key, +1, null);
 
         /// <inheritdoc />
-        public override void IncrementCounter(string key, TimeSpan expireIn)
-        {
-            throw new NotImplementedException();
-        }
+        public override void IncrementCounter(string key, TimeSpan expireIn) => this.SetCounter(key, +1, expireIn);
 
         /// <inheritdoc />
-        public override void DecrementCounter(string key)
-        {
-            throw new NotImplementedException();
-        }
+        public override void DecrementCounter(string key) => this.SetCounter(key, -1, null);
 
         /// <inheritdoc />
-        public override void DecrementCounter(string key, TimeSpan expireIn)
-        {
-            throw new NotImplementedException();
-        }
+        public override void DecrementCounter(string key, TimeSpan expireIn) => this.SetCounter(key, -1, expireIn);
 
         /// <inheritdoc />
         public override void AddToSet(string key, string value) => this.AddToSet(key, value, 0d);
@@ -164,7 +160,17 @@
         /// <inheritdoc />
         public override void RemoveFromSet(string key, string value)
         {
-            throw new NotImplementedException();
+            const string DeleteSetSql = "DELETE FROM [Set] WHERE [Key]=@key AND [Value]=@value";
+
+            this.AcquireSetLock();
+            this.EnqueueCommand(
+                session => session.Execute(
+                    DeleteSetSql,
+                    new
+                    {
+                        key,
+                        value
+                    }));
         }
 
         /// <inheritdoc />
@@ -199,12 +205,25 @@
 
         private void EnqueueCommand(Action<ISession> command) => this.commandQueue.Enqueue(command);
 
+                private void SetCounter(string key, int value, TimeSpan? expireIn)
+        {
+            const string IncrementCounterSql = "INSERT INTO [Counter]([Key], [Value], [ExpireAt])" +
+                                               " VALUES (@key, @value, @expireAt)";
+            this.EnqueueCommand(
+                session => session.Execute(
+                    IncrementCounterSql,
+                    new
+                    {
+                        key,
+                        value,
+                        expireAt = expireIn.HasValue ? DateTime.UtcNow.Add(expireIn.Value) : (DateTime?)null
+                    }));
+        }
+
         private void AcquireSetLock()
         {
             const string Resource = "Set";
-            this.AcquireLock(Resource);
+            this.lockedResources.Add(Resource);
         }
-
-        private void AcquireLock(string resource) => this.lockedResources.Add(resource);
     }
 }

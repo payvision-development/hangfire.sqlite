@@ -98,6 +98,17 @@ CREATE INDEX IF NOT EXISTS [IX_HangFire_Set_Score]
 ON [Set]
 ([Key] ASC, [Score] ASC);
 
+
+CREATE TABLE IF NOT EXISTS [Counter] (
+	[Key]		NVARCHAR(100) NOT NULL COLLATE NOCASE,
+	[Value]		INTEGER NOT NULL,
+	[ExpireAt]	DATETIME
+);
+CREATE INDEX IF NOT EXISTS [CX_HangFire_Counter]
+ON [Counter]
+([Key] ASC);
+
+
 --SET SCHEMA VERSION
 REPLACE INTO [Schema]([Version]) VALUES (1);
 
