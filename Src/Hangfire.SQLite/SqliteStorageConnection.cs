@@ -120,14 +120,94 @@
         /// <inheritdoc />
         public void SetJobParameter(string id, string name, string value)
         {
-            throw new NotImplementedException();
+            if (id == null)
+            {
+                throw new ArgumentNullException(nameof(id));
+            }
+
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            const string InsertJobParameterSql = "REPLACE INTO [JobParameter](JobId, Name, Value) " +
+                                                 "VALUES (@jobId, @name, @value)";
+            this.storage.Execute(
+                InsertJobParameterSql,
+                new
+                {
+                    jobId = long.Parse(id, CultureInfo.InvariantCulture),
+                    name,
+                    value
+                });
         }
 
         /// <inheritdoc />
-        public string GetJobParameter(string id, string name) => throw new NotImplementedException();
+        public string GetJobParameter(string id, string name)
+        {
+            if (id == null)
+            {
+                throw new ArgumentNullException(nameof(id));
+            }
+
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            const string GetJobParameterSql = "SELECT Value FROM [JobParameter] WHERE JobId=@id AND Name=@name LIMIT 1";
+            return this.storage.ExecuteScalar<string>(
+                GetJobParameterSql,
+                new
+                {
+                    id = long.Parse(id, CultureInfo.InvariantCulture),
+                    name
+                });
+        }
 
         /// <inheritdoc />
-        public JobData GetJobData(string jobId) => throw new NotImplementedException();
+        public JobData GetJobData(string jobId)
+        {
+            if (jobId == null)
+            {
+                throw new ArgumentNullException(nameof(jobId));
+            }
+
+            const string GetJobDataSql = "SELECT InvocationData, StateName, Arguments, CreatedAt " +
+                                         "FROM [Job] WHERE Id=@id";
+
+            SqliteJob storedJobData = this.storage.Query<SqliteJob>(
+                    GetJobDataSql,
+                    new { id = long.Parse(jobId, CultureInfo.InvariantCulture) })
+                .SingleOrDefault();
+            if (storedJobData == null)
+            {
+                return null;
+            }
+
+            // TODO: conversion exception could be thrown. (From HangFire)
+            InvocationData invocationData = InvocationData.DeserializePayload(storedJobData.InvocationData);
+            if (!string.IsNullOrEmpty(storedJobData.Arguments))
+            {
+                invocationData.Arguments = storedJobData.Arguments;
+            }
+
+            var jobData = new JobData
+            {
+                State = storedJobData.StateName,
+                CreatedAt = storedJobData.CreatedAt
+            };
+            try
+            {
+                jobData.Job = invocationData.DeserializeJob();
+            }
+            catch (JobLoadException exception)
+            {
+                jobData.LoadException = exception;
+            }
+
+            return jobData;
+        }
 
         /// <inheritdoc />
         public StateData GetStateData(string jobId) => throw new NotImplementedException();
