@@ -211,7 +211,35 @@
         }
 
         /// <inheritdoc />
-        public StateData GetStateData(string jobId) => throw new NotImplementedException();
+        public StateData GetStateData(string jobId)
+        {
+            if (jobId == null)
+            {
+                throw new ArgumentNullException(nameof(jobId));
+            }
+
+            const string GetDataSql = "SELECT s.Name, s.Reason, s.Data FROM [State] s " +
+                                      "INNER JOIN [Job] j ON j.StateId=s.Id AND j.Id=s.JobId WHERE j.Id=@jobId";
+
+            SqliteState sqlState = this.storage.Query<SqliteState>(
+                    GetDataSql,
+                    new { jobId = long.Parse(jobId, CultureInfo.InvariantCulture) })
+                .SingleOrDefault();
+            if (sqlState == null)
+            {
+                return null;
+            }
+
+            var data = new Dictionary<string, string>(
+                SerializationHelper.Deserialize<Dictionary<string, string>>(sqlState.Data),
+                StringComparer.OrdinalIgnoreCase);
+            return new StateData
+            {
+                Name = sqlState.Name,
+                Reason = sqlState.Reason,
+                Data = data
+            };
+        }
 
         /// <inheritdoc />
         public void AnnounceServer(string serverId, ServerContext context)
@@ -351,7 +379,7 @@
             }
 
             const string GetHashesSql = "SELECT Field, Value FROM [Hash] WHERE [Key]=@key";
-            return this.storage.Query<SqlHash>(GetHashesSql, new { key }).ToDictionary(x => x.Field, x => x.Value);
+            return this.storage.Query<SqliteHash>(GetHashesSql, new { key }).ToDictionary(x => x.Field, x => x.Value);
         }
 
         /// <inheritdoc />

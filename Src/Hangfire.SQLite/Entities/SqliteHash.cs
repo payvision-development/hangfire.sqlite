@@ -2,7 +2,7 @@
 {
     using System;
 
-    internal class SqlHash
+    internal sealed class SqliteHash
     {
         public string Key { get; set; }
 
