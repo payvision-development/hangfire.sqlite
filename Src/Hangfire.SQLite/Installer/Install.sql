@@ -73,6 +73,25 @@ CREATE INDEX IF NOT EXISTS [IX_HangFire_Server_LastHeartbeat]
 ON [Server]
 ([LastHeartbeat] ASC);
 
+-- Extension tables
+CREATE TABLE IF NOT EXISTS [Set] (
+	[Id]		INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	[Key]		NVARCHAR(100) NOT NULL COLLATE NOCASE,
+	[Score]		FLOAT NOT NULL,
+	[Value]		NVARCHAR(256) NOT NULL COLLATE NOCASE,
+	[ExpireAt]	DATETIME
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS [PK_HangFire_Set]
+ON [Set]
+([Key] ASC, [VALUE] ASC);
+CREATE INDEX IF NOT EXISTS [IX_HangFire_Set_ExpireAt]
+ON [Set]
+([ExpireAt] ASC);
+CREATE INDEX IF NOT EXISTS [IX_HangFire_Set_Score]
+ON [Set]
+([Key] ASC, [Score] ASC);
+
 --SET SCHEMA VERSION
 REPLACE INTO [Schema]([Version]) VALUES (1);
 

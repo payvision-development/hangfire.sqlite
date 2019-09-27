@@ -212,10 +212,20 @@
         }
 
         /// <inheritdoc />
-        public HashSet<string> GetAllItemsFromSet(string key) => throw new NotImplementedException();
+        public HashSet<string> GetAllItemsFromSet(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string GetSetSql = "SELECT Value FROM [Set] WHERE [Key] = @key";
+            return new HashSet<string>(this.storage.Query<string>(GetSetSql, new { key }));
+        }
 
         /// <inheritdoc />
-        public string GetFirstByLowestScoreFromSet(string key, double fromScore, double toScore) => throw new NotImplementedException();
+        public string GetFirstByLowestScoreFromSet(string key, double fromScore, double toScore) =>
+            this.GetFirstByLowestScoreFromSet(key, fromScore, toScore, 1).FirstOrDefault();
 
         /// <inheritdoc />
         public void SetRangeInHash(string key, IEnumerable<KeyValuePair<string, string>> keyValuePairs)
@@ -236,6 +246,41 @@
 
             this.lockedResources.Dispose();
             this.lockedResources = null;
+        }
+
+        private IEnumerable<string> GetFirstByLowestScoreFromSet(
+            string key,
+            double fromScore,
+            double toScore,
+            int count)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (count <= 0)
+            {
+                throw new ArgumentException($"The `{nameof(count)}`value must be a positive number.");
+            }
+
+            if (toScore < fromScore)
+            {
+                throw new ArgumentException(
+                    $"The `{nameof(toScore)}`value must be higher or equal than the `{nameof(fromScore)}` value.");
+            }
+
+            const string GetScoreSetSql =
+                "SELECT Value FROM [Set] WHERE [Key]=@key AND Score BETWEEN @from AND @to ORDER BY Score LIMIT 1";
+
+            return this.storage.Query<string>(
+                GetScoreSetSql,
+                new
+                {
+                    key,
+                    from = fromScore,
+                    to = toScore
+                });
         }
     }
 }
