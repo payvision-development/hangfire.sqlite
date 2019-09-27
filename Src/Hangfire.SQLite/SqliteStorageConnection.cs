@@ -26,7 +26,8 @@
         }
 
         /// <inheritdoc />
-        public IWriteOnlyTransaction CreateWriteTransaction() => new SqliteWriteOnlyTransaction(this.storage);
+        public IWriteOnlyTransaction CreateWriteTransaction() =>
+            new SqliteWriteOnlyTransaction(this.storage, this.lockedResources);
 
         /// <inheritdoc />
         public IDisposable AcquireDistributedLock(string resource, TimeSpan timeout)

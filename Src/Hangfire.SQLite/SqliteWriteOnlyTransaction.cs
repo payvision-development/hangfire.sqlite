@@ -5,6 +5,7 @@
     using System.Globalization;
 
     using Hangfire.Common;
+    using Hangfire.Sqlite.Concurrency;
     using Hangfire.Sqlite.Db;
     using Hangfire.Sqlite.Queues;
     using Hangfire.States;
@@ -19,27 +20,37 @@
 
         private readonly Queue<Action> afterCommitCommandQueue = new Queue<Action>();
 
+        private readonly SortedSet<string> lockedResources = new SortedSet<string>();
+
         private readonly IJobStorage storage;
 
-        public SqliteWriteOnlyTransaction(IJobStorage storage) =>
+        private readonly ILockedResources locker;
+
+        public SqliteWriteOnlyTransaction(IJobStorage storage, ILockedResources lockedResources)
+        {
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
+            this.locker = lockedResources ?? throw new ArgumentNullException(nameof(lockedResources));
+        }
 
         /// <inheritdoc />
         public override void Commit()
         {
-            using (ITransaction transaction = this.storage.BeginTransaction())
+            using (this.locker.Lock(this.lockedResources))
             {
-                foreach (Action<ISession> command in this.commandQueue)
+                using (ITransaction transaction = this.storage.BeginTransaction())
                 {
-                    command(transaction);
+                    foreach (Action<ISession> command in this.commandQueue)
+                    {
+                        command(transaction);
+                    }
+
+                    transaction.Commit();
                 }
 
-                transaction.Commit();
-            }
-
-            foreach (Action command in this.afterCommitCommandQueue)
-            {
-                command();
+                foreach (Action command in this.afterCommitCommandQueue)
+                {
+                    command();
+                }
             }
         }
 
@@ -59,7 +70,7 @@
         /// <inheritdoc />
         public override void SetJobState(string jobId, IState state)
         {
-            const string AddAndSetStateSql = "INSERT INTO State (JobId, Name, Reason, CreatedAt, Data) " +
+            const string AddAndSetStateSql = "INSERT INTO [State](JobId, Name, Reason, CreatedAt, Data) " +
                                              "VALUES (@jobId, @name, @reason, @createdAt, @data);" +
                                              "UPDATE Job SET StateId=last_insert_rowid(), StateName=@name WHERE ID=@jobId;";
             long id = long.Parse(jobId, CultureInfo.InvariantCulture);
@@ -131,15 +142,23 @@
         }
 
         /// <inheritdoc />
-        public override void AddToSet(string key, string value)
-        {
-            throw new NotImplementedException();
-        }
+        public override void AddToSet(string key, string value) => this.AddToSet(key, value, 0d);
 
         /// <inheritdoc />
         public override void AddToSet(string key, string value, double score)
         {
-            throw new NotImplementedException();
+            const string AddSetSql = "REPLACE INTO [Set]([Key], Value, Score) VALUES (@key, @value, @score)";
+
+            this.AcquireSetLock();
+            this.EnqueueCommand(
+                x => x.Execute(
+                    AddSetSql,
+                    new
+                    {
+                        key,
+                        value,
+                        score
+                    }));
         }
 
         /// <inheritdoc />
@@ -179,5 +198,13 @@
         }
 
         private void EnqueueCommand(Action<ISession> command) => this.commandQueue.Enqueue(command);
+
+        private void AcquireSetLock()
+        {
+            const string Resource = "Set";
+            this.AcquireLock(Resource);
+        }
+
+        private void AcquireLock(string resource) => this.lockedResources.Add(resource);
     }
 }

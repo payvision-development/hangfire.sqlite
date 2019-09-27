@@ -12,7 +12,7 @@
     /// processes, for example, if the application is running on an ASP.Net server with
     /// multiple processes.
     /// </remarks>
-    internal sealed class LockedResources : IDisposable
+    internal sealed class LockedResources : ILockedResources
     {
         private readonly Dictionary<string, (Mutex, HashSet<Guid>)>
             lockedResources = new Dictionary<string, (Mutex, HashSet<Guid>)>();
@@ -28,14 +28,7 @@
             GC.SuppressFinalize(this);
         }
 
-        /// <summary>
-        /// Gets a lock of the specified resource.
-        /// </summary>
-        /// <remarks>The lock will wait until is available so long as the specified <paramref name="timeout"/>.</remarks>
-        /// <param name="resource">The resource to be locked.</param>
-        /// <param name="timeout">The maximum waiting time allowed in order to get the lock.</param>
-        /// <returns>The lock instance release when called <see cref="IDisposable.Dispose()"/>.</returns>
-        /// <exception cref="TimeoutException">If the lock is not available before than the specified timeout.</exception>
+        /// <inheritdoc />
         public IDisposable Lock(string resource, TimeSpan timeout)
         {
             if (resource == null)
