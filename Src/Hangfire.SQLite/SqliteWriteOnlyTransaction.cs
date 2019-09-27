@@ -176,19 +176,52 @@
         /// <inheritdoc />
         public override void InsertToList(string key, string value)
         {
-            throw new NotImplementedException();
+            const string InsertListSql = "INSERT INTO [List]([Key], [Value]) VALUES (@key, @value)";
+
+            this.AcquireListLock();
+            this.EnqueueCommand(
+                session => session.Execute(
+                    InsertListSql,
+                    new
+                    {
+                        key,
+                        value
+                    }));
         }
 
         /// <inheritdoc />
         public override void RemoveFromList(string key, string value)
         {
-            throw new NotImplementedException();
+            const string DeleteListSql = "DELETE FROM [List] WHERE [Key]=@key AND [Value]=@value";
+
+            this.AcquireListLock();
+            this.EnqueueCommand(
+                session => session.Execute(
+                    DeleteListSql,
+                    new
+                    {
+                        key,
+                        value
+                    }));
         }
 
         /// <inheritdoc />
         public override void TrimList(string key, int keepStartingFrom, int keepEndingAt)
         {
-            throw new NotImplementedException();
+            const string TrimSql = "DELETE FROM [List] WHERE [Key]=@key AND Id NOT IN (" +
+                                   "SELECT Id FROM [List] WHERE [Key]=@key ORDER BY Id DESC " +
+                                   "LIMIT @limit OFFSET @offset";
+            
+            this.AcquireListLock();
+            this.EnqueueCommand(
+                session => session.Execute(
+                    TrimSql,
+                    new
+                    {
+                        key,
+                        limit = keepEndingAt - keepStartingFrom + 1,
+                        offset = keepStartingFrom
+                    }));
         }
 
         /// <inheritdoc />
@@ -224,6 +257,12 @@
         {
             const string Resource = "Set";
             this.lockedResources.Add(Resource);
+        }
+
+        private void AcquireListLock()
+        {
+            const string Resorce = "List";
+            this.lockedResources.Add(Resorce);
         }
     }
 }
