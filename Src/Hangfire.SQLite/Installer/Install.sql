@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS [State] (
         ON UPDATE CASCADE
         ON DELETE CASCADE
 );
+CREATE UNIQUE INDEX IF NOT EXISTS [PK_HangFire_State]
+ON [State]
+([JobId] ASC, [Id] ASC);
 
 -- Create Job queue table
 CREATE TABLE IF NOT EXISTS [JobQueue] (

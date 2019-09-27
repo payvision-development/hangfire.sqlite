@@ -79,7 +79,20 @@
         /// <inheritdoc />
         public override void AddJobState(string jobId, IState state)
         {
-            throw new NotImplementedException();
+            const string AddStateSql = "INSERT INTO [State](JobId, Name, Reason, CreatedAt, Data) " +
+                                       "VALUES (@jobId, @name, @reason, @createdAt, @data)";
+
+            this.EnqueueCommand(
+                x => x.Execute(
+                    AddStateSql,
+                    new
+                    {
+                        jobId = long.Parse(jobId, CultureInfo.InvariantCulture),
+                        name = state.Name,
+                        reason = state.Reason?.Substring(0, Math.Min(99, state.Reason.Length)),
+                        createdAt = DateTime.UtcNow,
+                        data = SerializationHelper.Serialize(state.SerializeData())
+                    }));
         }
 
         /// <inheritdoc />
