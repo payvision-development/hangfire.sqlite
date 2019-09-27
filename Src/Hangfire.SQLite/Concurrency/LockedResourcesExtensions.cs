@@ -12,28 +12,87 @@
         private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);
 
         /// <summary>
-        /// Locks the specified resources waiting until all resources are released in case of any process else
-        /// would have an active lock over some of such resources.
+        /// Acquires a lock on the HangFire's <c>Set</c> resource.
         /// </summary>
-        /// <remarks>In this case, 15 seconds timeout will be applied.</remarks>
-        /// <param name="locker">The extended <see cref="ILockedResources"/>.</param>
-        /// <param name="resources">The resources to be locked.</param>
-        /// <returns>The lock instance release when called <see cref="IDisposable.Dispose()"/>.</returns>
-        /// <exception cref="TimeoutException">If the lock is not available before than the specified timeout.</exception>
-        public static IDisposable Lock(this ILockedResources locker, IEnumerable<string> resources) =>
-            locker.Lock(resources, DefaultTimeout);
+        /// <param name="lockedResources">The locked resources instance to perform the lock.</param>
+        /// <returns>The handler to release the lock.</returns>
+        public static IDisposable AcquireSetLock(this ILockedResources lockedResources) =>
+            lockedResources.AcquireSetLock(DefaultTimeout);
 
         /// <summary>
-        /// Locks the specified resources waiting until all resources are released in case of any process else
-        /// would have an active lock over some of such resources.
+        /// Acquires a lock on the HangFire's <c>Set</c> resource.
         /// </summary>
-        /// <param name="locker">The extended <see cref="ILockedResources"/>.</param>
-        /// <param name="resources">The resources to be locked.</param>
-        /// <param name="timeout">The maximum waiting time allowed in order to get the lock.</param>
-        /// <returns>The lock instance release when called <see cref="IDisposable.Dispose()"/>.</returns>
-        /// <exception cref="TimeoutException">If the lock is not available before than the specified timeout.</exception>
-        public static IDisposable Lock(this ILockedResources locker, IEnumerable<string> resources, TimeSpan timeout) =>
-            new LockBundle(resources.Select(x => locker.Lock(x, timeout)));
+        /// <param name="lockedResources">The locked resources instance to perform the lock.</param>
+        /// <param name="timeout">The lock timeout.</param>
+        /// <returns>The handler to release the lock.</returns>
+        public static IDisposable AcquireSetLock(this ILockedResources lockedResources, TimeSpan timeout)
+        {
+            const string Resource = "Set:Lock";
+            return lockedResources.Lock(Resource, timeout);
+        }
+
+        /// <summary>
+        /// Acquires a lock on the HangFire's <c>Lis</c> resource.
+        /// </summary>
+        /// <param name="lockedResources">The locked resources instance to perform the lock.</param>
+        /// <returns>The handler to release the lock.</returns>
+        public static IDisposable AcquireListLock(this ILockedResources lockedResources) =>
+            lockedResources.AcquireListLock(DefaultTimeout);
+
+        /// <summary>
+        /// Acquires a lock on the HangFire's <c>Lis</c> resource.
+        /// </summary>
+        /// <param name="lockedResources">The locked resources instance to perform the lock.</param>
+        /// <param name="timeout">The lock timeout.</param>
+        /// <returns>The handler to release the lock.</returns>
+        public static IDisposable AcquireListLock(this ILockedResources lockedResources, TimeSpan timeout)
+        {
+            const string Resource = "List:Lock";
+            return lockedResources.Lock(Resource, timeout);
+        }
+
+        /// <summary>
+        /// Acquires a lock on the HangFire's <c>Hash</c> resource.
+        /// </summary>
+        /// <param name="lockedResources">The locked resources instance to perform the lock.</param>
+        /// <returns>The handler to release the lock.</returns>
+        public static IDisposable AcquireHashLock(this ILockedResources lockedResources) =>
+            lockedResources.AcquireHashLock(DefaultTimeout);
+
+        /// <summary>
+        /// Acquires a lock on the HangFire's <c>Hash</c> resource.
+        /// </summary>
+        /// <param name="lockedResources">The locked resources instance to perform the lock.</param>
+        /// <param name="timeout">The lock timeout.</param>
+        /// <returns>The handler to release the lock.</returns>
+        public static IDisposable AcquireHashLock(this ILockedResources lockedResources, TimeSpan timeout)
+        {
+            const string Resource = "Hash:Lock";
+            return lockedResources.Lock(Resource, timeout);
+        }
+
+        /// <summary>
+        /// Performs all the specified locks bundle them on a single lock handler.
+        /// </summary>
+        /// <param name="lockedResources">The <see cref="ILockedResources"/> to perform the locks.</param>
+        /// <param name="locks">The lock actions to be performed.</param>
+        /// <returns>The bundled lock handler to dispose all the locks at the same time.</returns>
+        public static IDisposable LockAll(
+            this ILockedResources lockedResources,
+            IEnumerable<Func<ILockedResources, IDisposable>> locks)
+        {
+            if (lockedResources == null)
+            {
+                throw new ArgumentNullException(nameof(lockedResources));
+            }
+
+            if (locks == null)
+            {
+                throw new ArgumentNullException(nameof(locks));
+            }
+
+            return new LockBundle(locks.Select(@lock => @lock(lockedResources)));
+        }
 
         private sealed class LockBundle : IDisposable
         {

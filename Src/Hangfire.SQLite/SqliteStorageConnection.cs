@@ -311,11 +311,48 @@
         /// <inheritdoc />
         public void SetRangeInHash(string key, IEnumerable<KeyValuePair<string, string>> keyValuePairs)
         {
-            throw new NotImplementedException();
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (keyValuePairs == null)
+            {
+                throw new ArgumentNullException(nameof(keyValuePairs));
+            }
+
+            const string MergeHashSql = "REPLACE INTO [Hash]([Key], [Field], [Value]) VALUES (@key, @field, @value)";
+
+            using (this.lockedResources.AcquireHashLock())
+            using (ITransaction transaction = this.storage.BeginTransaction())
+            {
+                foreach (KeyValuePair<string, string> pair in keyValuePairs)
+                {
+                    transaction.Execute(
+                        MergeHashSql,
+                        new
+                        {
+                            key,
+                            field = pair.Key,
+                            value = pair.Value
+                        });
+                }
+
+                transaction.Commit();
+            }
         }
 
         /// <inheritdoc />
-        public Dictionary<string, string> GetAllEntriesFromHash(string key) => throw new NotImplementedException();
+        public Dictionary<string, string> GetAllEntriesFromHash(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string GetHashesSql = "SELECT Field, Value FROM [Hash] WHERE [Key]=@key";
+            return this.storage.Query<SqlHash>(GetHashesSql, new { key }).ToDictionary(x => x.Field, x => x.Value);
+        }
 
         /// <inheritdoc />
         public void Dispose()

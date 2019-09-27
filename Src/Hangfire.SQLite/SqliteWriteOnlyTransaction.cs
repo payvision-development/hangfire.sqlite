@@ -20,22 +20,23 @@
 
         private readonly Queue<Action> afterCommitCommandQueue = new Queue<Action>();
 
-        private readonly SortedSet<string> lockedResources = new SortedSet<string>();
+        private readonly Queue<Func<ILockedResources, IDisposable>> pendingLocks =
+            new Queue<Func<ILockedResources, IDisposable>>();
 
         private readonly IJobStorage storage;
 
-        private readonly ILockedResources locker;
+        private readonly ILockedResources lockedResources;
 
         public SqliteWriteOnlyTransaction(IJobStorage storage, ILockedResources lockedResources)
         {
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
-            this.locker = lockedResources ?? throw new ArgumentNullException(nameof(lockedResources));
+            this.lockedResources = lockedResources ?? throw new ArgumentNullException(nameof(lockedResources));
         }
 
         /// <inheritdoc />
         public override void Commit()
         {
-            using (this.locker.Lock(this.lockedResources))
+            using (this.lockedResources.LockAll(this.pendingLocks))
             {
                 using (ITransaction transaction = this.storage.BeginTransaction())
                 {
@@ -211,7 +212,7 @@
             const string TrimSql = "DELETE FROM [List] WHERE [Key]=@key AND Id NOT IN (" +
                                    "SELECT Id FROM [List] WHERE [Key]=@key ORDER BY Id DESC " +
                                    "LIMIT @limit OFFSET @offset";
-            
+
             this.AcquireListLock();
             this.EnqueueCommand(
                 session => session.Execute(
@@ -227,18 +228,49 @@
         /// <inheritdoc />
         public override void SetRangeInHash(string key, IEnumerable<KeyValuePair<string, string>> keyValuePairs)
         {
-            throw new NotImplementedException();
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (keyValuePairs == null)
+            {
+                throw new ArgumentNullException(nameof(keyValuePairs));
+            }
+
+            const string MergeHashSql = "REPLACE INTO [Hash](Key, Field, Value) VALUES (@key, @field, @value)";
+
+            this.AcquireHashLock();
+            foreach (KeyValuePair<string, string> pair in keyValuePairs)
+            {
+                this.EnqueueCommand(
+                    session => session.Execute(
+                        MergeHashSql,
+                        new
+                        {
+                            key,
+                            field = pair.Key,
+                            value = pair.Value
+                        }));
+            }
         }
 
         /// <inheritdoc />
         public override void RemoveHash(string key)
         {
-            throw new NotImplementedException();
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string RemoveHashSql = "DELETE FROM [Hash] WHERE [Key]=@key";
+            this.AcquireHashLock();
+            this.EnqueueCommand(session => session.Execute(RemoveHashSql, new { key }));
         }
 
         private void EnqueueCommand(Action<ISession> command) => this.commandQueue.Enqueue(command);
 
-                private void SetCounter(string key, int value, TimeSpan? expireIn)
+        private void SetCounter(string key, int value, TimeSpan? expireIn)
         {
             const string IncrementCounterSql = "INSERT INTO [Counter]([Key], [Value], [ExpireAt])" +
                                                " VALUES (@key, @value, @expireAt)";
@@ -253,16 +285,10 @@
                     }));
         }
 
-        private void AcquireSetLock()
-        {
-            const string Resource = "Set";
-            this.lockedResources.Add(Resource);
-        }
+        private void AcquireSetLock() => this.pendingLocks.Enqueue(x => x.AcquireSetLock());
 
-        private void AcquireListLock()
-        {
-            const string Resorce = "List";
-            this.lockedResources.Add(Resorce);
-        }
+        private void AcquireListLock() => this.pendingLocks.Enqueue(x => x.AcquireListLock());
+
+        private void AcquireHashLock() => this.pendingLocks.Enqueue(x => x.AcquireHashLock());
     }
 }
