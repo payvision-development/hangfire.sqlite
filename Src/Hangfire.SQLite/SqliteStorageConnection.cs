@@ -14,7 +14,7 @@
     using Hangfire.Sqlite.Queues;
     using Hangfire.Storage;
 
-    internal sealed class SqliteStorageConnection : IStorageConnection
+    internal sealed class SqliteStorageConnection : JobStorageConnection
     {
         private readonly IJobStorage storage;
 
@@ -26,11 +26,11 @@
         }
 
         /// <inheritdoc />
-        public IWriteOnlyTransaction CreateWriteTransaction() =>
+        public override IWriteOnlyTransaction CreateWriteTransaction() =>
             new SqliteWriteOnlyTransaction(this.storage, this.lockedResources);
 
         /// <inheritdoc />
-        public IDisposable AcquireDistributedLock(string resource, TimeSpan timeout)
+        public override IDisposable AcquireDistributedLock(string resource, TimeSpan timeout)
         {
             if (string.IsNullOrWhiteSpace(resource))
             {
@@ -41,7 +41,7 @@
         }
 
         /// <inheritdoc />
-        public string CreateExpiredJob(
+        public override string CreateExpiredJob(
             Job job,
             IDictionary<string, string> parameters,
             DateTime createdAt,
@@ -96,7 +96,7 @@
         }
 
         /// <inheritdoc />
-        public IFetchedJob FetchNextJob(string[] queues, CancellationToken cancellationToken)
+        public override IFetchedJob FetchNextJob(string[] queues, CancellationToken cancellationToken)
         {
             if (queues == null || queues.Length == 0)
             {
@@ -119,7 +119,7 @@
         }
 
         /// <inheritdoc />
-        public void SetJobParameter(string id, string name, string value)
+        public override void SetJobParameter(string id, string name, string value)
         {
             if (id == null)
             {
@@ -144,7 +144,7 @@
         }
 
         /// <inheritdoc />
-        public string GetJobParameter(string id, string name)
+        public override string GetJobParameter(string id, string name)
         {
             if (id == null)
             {
@@ -167,7 +167,7 @@
         }
 
         /// <inheritdoc />
-        public JobData GetJobData(string jobId)
+        public override JobData GetJobData(string jobId)
         {
             if (jobId == null)
             {
@@ -211,7 +211,7 @@
         }
 
         /// <inheritdoc />
-        public StateData GetStateData(string jobId)
+        public override StateData GetStateData(string jobId)
         {
             if (jobId == null)
             {
@@ -242,7 +242,7 @@
         }
 
         /// <inheritdoc />
-        public void AnnounceServer(string serverId, ServerContext context)
+        public override void AnnounceServer(string serverId, ServerContext context)
         {
             if (serverId == null)
             {
@@ -274,7 +274,7 @@
         }
 
         /// <inheritdoc />
-        public void RemoveServer(string serverId)
+        public override void RemoveServer(string serverId)
         {
             if (serverId == null)
             {
@@ -286,7 +286,7 @@
         }
 
         /// <inheritdoc />
-        public void Heartbeat(string serverId)
+        public override void Heartbeat(string serverId)
         {
             if (serverId == null)
             {
@@ -308,7 +308,7 @@
         }
 
         /// <inheritdoc />
-        public int RemoveTimedOutServers(TimeSpan timeOut)
+        public override int RemoveTimedOutServers(TimeSpan timeOut)
         {
             if (timeOut.Duration() != timeOut)
             {
@@ -321,7 +321,7 @@
         }
 
         /// <inheritdoc />
-        public HashSet<string> GetAllItemsFromSet(string key)
+        public override HashSet<string> GetAllItemsFromSet(string key)
         {
             if (key == null)
             {
@@ -333,11 +333,11 @@
         }
 
         /// <inheritdoc />
-        public string GetFirstByLowestScoreFromSet(string key, double fromScore, double toScore) =>
+        public override string GetFirstByLowestScoreFromSet(string key, double fromScore, double toScore) =>
             this.GetFirstByLowestScoreFromSet(key, fromScore, toScore, 1).FirstOrDefault();
 
         /// <inheritdoc />
-        public void SetRangeInHash(string key, IEnumerable<KeyValuePair<string, string>> keyValuePairs)
+        public override void SetRangeInHash(string key, IEnumerable<KeyValuePair<string, string>> keyValuePairs)
         {
             if (key == null)
             {
@@ -371,7 +371,7 @@
         }
 
         /// <inheritdoc />
-        public Dictionary<string, string> GetAllEntriesFromHash(string key)
+        public override Dictionary<string, string> GetAllEntriesFromHash(string key)
         {
             if (key == null)
             {
@@ -383,18 +383,19 @@
         }
 
         /// <inheritdoc />
-        public void Dispose()
+        public override void Dispose()
         {
             if (this.lockedResources == null)
             {
                 return;
             }
 
+            base.Dispose();
             this.lockedResources.Dispose();
             this.lockedResources = null;
         }
 
-        private IEnumerable<string> GetFirstByLowestScoreFromSet(
+        public override List<string> GetFirstByLowestScoreFromSet(
             string key,
             double fromScore,
             double toScore,
@@ -426,7 +427,190 @@
                     key,
                     from = fromScore,
                     to = toScore
+                }).ToList();
+        }
+
+        /// <inheritdoc />
+        public override long GetSetCount(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string CountSql = "SELECT COUNT(*) FROM [Set] WHERE [Key]=@key";
+
+            return this.storage.ExecuteScalar<int>(CountSql, new { key });
+        }
+
+        /// <inheritdoc />
+        public override List<string> GetRangeFromSet(string key, int startingFrom, int endingAt)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string RangeSql = "SELECT [Value] FROM [Set] WHERE [Key]=@key ORDER BY Id ASC " +
+                                    "LIMIT @limit @OFFSET @offset";
+            return this.storage.Query<string>(
+                    RangeSql,
+                    new
+                    {
+                        key,
+                        limit = endingAt - startingFrom + 1,
+                        offset = startingFrom
+                    })
+                .ToList();
+        }
+
+        /// <inheritdoc />
+        public override TimeSpan GetSetTtl(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string QuerySql = "SELECT MIN([ExpireAt]) FROM [Set] WHERE [Key]=@key";
+            var result = this.storage.ExecuteScalar<DateTime?>(QuerySql, new { key });
+            if (!result.HasValue)
+            {
+                return TimeSpan.FromSeconds(-1);
+            }
+
+            return result.Value - DateTime.UtcNow;
+        }
+
+        /// <inheritdoc />
+        public override string GetValueFromHash(string key, string name)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            const string ValueQuery = "SELECT [Value] FROM [Hash] WHERE [Key]=@key AND [Field]=@field";
+            return this.storage.ExecuteScalar<string>(
+                ValueQuery,
+                new
+                {
+                    key,
+                    field = name
                 });
+        }
+
+        /// <inheritdoc />
+        public override long GetHashCount(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string CountSql = "SELECT COUNT(*) FROM [Hash] WHERE [Key]=@key";
+            return this.storage.ExecuteScalar<long>(CountSql, new { key });
+        }
+
+        /// <inheritdoc />
+        public override TimeSpan GetHashTtl(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string Query = "SELECT MIN([ExpireAt]) FROM [Hash] WHERE [Key]=@key";
+            DateTime? result = this.storage.ExecuteScalar<DateTime?>(Query, new { key });
+            if (!result.HasValue)
+            {
+                return TimeSpan.FromSeconds(-1);
+            }
+
+            return result.Value - DateTime.UtcNow;
+        }
+
+        /// <inheritdoc />
+        public override long GetListCount(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string CountQuery = "SELECT COUNT(*) FROM [List] WHERE [Key]=@key";
+            return this.storage.ExecuteScalar<long>(CountQuery, new { key });
+        }
+
+        /// <inheritdoc />
+        public override List<string> GetAllItemsFromList(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string Query = "SELECT [Value] FROM [List] WHERE [Key]=@key ORDER BY [Id] DESC";
+            return this.storage.Query<string>(Query, new { key }).ToList();
+        }
+
+        /// <inheritdoc />
+        public override List<string> GetRangeFromList(string key, int startingFrom, int endingAt)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string Query = "SELECT [Value] FROM [List] WHERE [Key]=@key ORDER BY Id DESC" +
+                                 " LIMIT @limit OFFSET @offset";
+            return this.storage.Query<string>(
+                    Query,
+                    new
+                    {
+                        key,
+                        limit = endingAt - startingFrom + 1,
+                        offset = startingFrom
+                    })
+                .ToList();
+        }
+
+        /// <inheritdoc />
+        public override TimeSpan GetListTtl(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string ListSql = "SELECT MIN([ExpireAt]) FROM [List] WHERE [Key]=@key";
+            DateTime? result = this.storage.ExecuteScalar<DateTime?>(ListSql, new { key });
+            if (!result.HasValue)
+            {
+                return TimeSpan.FromSeconds(-1);
+            }
+
+            return result.Value - DateTime.UtcNow;
+        }
+
+        /// <inheritdoc />
+        public override long GetCounter(string key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            const string CounterSql = "SELECT SUM(s.[Value]) FROM (SELECT SUM([Value]) AS [Value] " +
+                                      "FROM [Counter] WHERE [Key]=@key UNION ALL " +
+                                      "SELECT [Value] FROM [AggregatedCounter] WHERE [Key]=@key) AS s";
+
+            return this.storage.ExecuteScalar<long?>(CounterSql, new { key }) ?? 0;
         }
     }
 }
