@@ -135,6 +135,20 @@ ON [Counter]
 ([Key] ASC);
 
 
+-- Create Monitoring tables
+CREATE TABLE IF NOT EXISTS [AggregatedCounter] (
+	[Id]		INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	[Key]		NVARCHAR(100) NOT NULL COLLATE NOCASE,
+	[Value]		BIGINT NOT NULL,
+	[ExpireAt]	DATETIME
+);
+CREATE UNIQUE INDEX IF NOT EXISTS [PK_HangFire_CounterAggregated]
+ON [AggregatedCounter]
+([Id] ASC);
+CREATE INDEX IF NOT EXISTS [IX_HangFire_AggregatedCounter_ExpireAt]
+ON [AggregatedCounter]
+([ExpireAt] ASC);
+
 --SET SCHEMA VERSION
 REPLACE INTO [Schema]([Version]) VALUES (1);
 

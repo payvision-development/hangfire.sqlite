@@ -52,6 +52,7 @@
                                         "Data Source=sample.sqlite;",
                                         new SqliteStorageOptions { QueuePollInterval = TimeSpan.FromSeconds(1) });
                             });
+                        services.AddHangfireServer();
                     })
                 .Configure(
                     app =>

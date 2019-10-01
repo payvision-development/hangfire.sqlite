@@ -9,6 +9,7 @@
 
     using Hangfire.Sqlite.Db;
     using Hangfire.Sqlite.Installer;
+    using Hangfire.Sqlite.Monitoring;
     using Hangfire.Sqlite.Queues;
     using Hangfire.Storage;
 
@@ -42,7 +43,8 @@
         }
 
         /// <inheritdoc />
-        public override IMonitoringApi GetMonitoringApi() => throw new System.NotImplementedException();
+        public override IMonitoringApi GetMonitoringApi() =>
+            new SqliteMonitoringApi(new JobRepository(this), this.options.DashboardJobListLimit);
 
         /// <inheritdoc />
         public override IStorageConnection GetConnection() => new SqliteStorageConnection(new JobRepository(this));
@@ -98,6 +100,9 @@
                         param,
                         this.dedicatedTransaction,
                         commandTimeout: this.CommandTimeout));
+
+            /// <inheritdoc />
+            public IGridReader QueryMultiple(string query, object param) => new GridReader(this, query, param);
 
             /// <inheritdoc />
             public T ExecuteScalar<T>(string query, object param) =>
@@ -156,6 +161,49 @@
                     if (connection != null && this.dedicatedConnection == null)
                     {
                         connection.Dispose();
+                    }
+                }
+            }
+
+            private sealed class GridReader : IGridReader
+            {
+                private readonly JobRepository session;
+
+                private readonly IDbConnection connection;
+
+                private SqlMapper.GridReader reader;
+
+                public GridReader(JobRepository session, string query, object param)
+                {
+                    this.session = session;
+                    this.connection = session.dedicatedConnection ?? session.owner.CreateAndOpenConnection();
+                    this.reader = this.connection.QueryMultiple(
+                        query,
+                        param,
+                        session.dedicatedTransaction,
+                        commandTimeout: session.CommandTimeout);
+                }
+
+                /// <inheritdoc />
+                public T ReadSingle<T>() => this.reader.ReadSingle<T>();
+
+                /// <inheritdoc />
+                public T ReadSingleOrDefault<T>() => this.reader.ReadSingleOrDefault<T>();
+
+                /// <inheritdoc />
+                public void Dispose()
+                {
+                    if (this.reader == null)
+                    {
+                        return;
+                    }
+
+                    this.reader.Dispose();
+                    this.reader = null;
+
+                    if (this.connection != this.session.dedicatedConnection)
+                    {
+                        this.connection.Dispose();
                     }
                 }
             }

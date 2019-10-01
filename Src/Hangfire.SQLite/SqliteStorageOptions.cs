@@ -39,5 +39,10 @@
                 this.queuePollInterval = value;
             }
         }
+
+        /// <summary>
+        /// Gets or sets the limits of items displayed on monitoring dashboard per page.
+        /// </summary>
+        public int? DashboardJobListLimit { get; set; }
     }
 }

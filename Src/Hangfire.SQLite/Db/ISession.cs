@@ -18,6 +18,14 @@
         IEnumerable<T> Query<T>(string query, object param);
 
         /// <summary>
+        /// Executes the specified query that returns multiple results.
+        /// </summary>
+        /// <param name="query">The query to be executed.</param>
+        /// <param name="param">The query parameter values.</param>
+        /// <returns>The multiple result reader.</returns>
+        IGridReader QueryMultiple(string query, object param);
+
+        /// <summary>
         /// Executes the parameterized query that returns only one value.
         /// </summary>
         /// <typeparam name="T">Type of the expected result.</typeparam>

@@ -9,5 +9,10 @@
         /// Gets the persistent job queue.
         /// </summary>
         IPersistentJobQueue JobQueue { get; }
+
+        /// <summary>
+        /// Gets the job queue monitor.
+        /// </summary>
+        IPersistentJobQueueMonitoringApi JobQueueMonitoringApi { get; }
     }
 }

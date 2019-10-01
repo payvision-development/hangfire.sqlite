@@ -15,9 +15,13 @@
             }
 
             this.JobQueue = new SqliteJobQueue(storage.Options.QueuePollInterval);
+            this.JobQueueMonitoringApi = new SqliteJobQueueMonitoringApi(storage);
         }
 
         /// <inheritdoc />
         public IPersistentJobQueue JobQueue { get; }
+
+        /// <inheritdoc />
+        public IPersistentJobQueueMonitoringApi JobQueueMonitoringApi { get; }
     }
 }
