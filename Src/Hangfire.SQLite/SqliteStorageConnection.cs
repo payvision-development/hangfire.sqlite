@@ -26,8 +26,7 @@
         }
 
         /// <inheritdoc />
-        public override IWriteOnlyTransaction CreateWriteTransaction() =>
-            new SqliteWriteOnlyTransaction(this.storage, this.lockedResources);
+        public override IWriteOnlyTransaction CreateWriteTransaction() => new SqliteWriteOnlyTransaction(this.storage);
 
         /// <inheritdoc />
         public override IDisposable AcquireDistributedLock(string resource, TimeSpan timeout)
@@ -351,7 +350,7 @@
 
             const string MergeHashSql = "REPLACE INTO [Hash]([Key], [Field], [Value]) VALUES (@key, @field, @value)";
 
-            using (this.lockedResources.AcquireHashLock())
+            using (this.storage.AcquireHashLock())
             using (ITransaction transaction = this.storage.BeginTransaction())
             {
                 foreach (KeyValuePair<string, string> pair in keyValuePairs)

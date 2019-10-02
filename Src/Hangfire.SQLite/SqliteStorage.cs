@@ -7,6 +7,9 @@
 
     using Dapper;
 
+    using Hangfire.Server;
+    using Hangfire.Sqlite.Components;
+    using Hangfire.Sqlite.Concurrency;
     using Hangfire.Sqlite.Db;
     using Hangfire.Sqlite.Installer;
     using Hangfire.Sqlite.Monitoring;
@@ -24,6 +27,8 @@
 
         private readonly string description = string.Empty;
 
+        private readonly ILockedResources lockedResources;
+
         private PersistentJobQueueProviderCollection queueProviders;
 
         public SqliteStorage(SQLiteConnectionStringBuilder connectionString, SqliteStorageOptions options)
@@ -38,9 +43,12 @@
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
             this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+            this.lockedResources = options.LockedResources();
 
             this.Initialize();
         }
+
+        ~SqliteStorage() => this.lockedResources.Dispose();
 
         /// <inheritdoc />
         public override IMonitoringApi GetMonitoringApi() =>
@@ -48,6 +56,12 @@
 
         /// <inheritdoc />
         public override IStorageConnection GetConnection() => new SqliteStorageConnection(new JobRepository(this));
+
+        /// <inheritdoc />
+        public override IEnumerable<IServerComponent> GetComponents()
+        {
+            yield return new ExpirationManager(new JobRepository(this), this.options.JobExpirationCheckInterval);
+        }
 
         /// <inheritdoc />
         public override string ToString() => this.description;
@@ -127,6 +141,9 @@
                     dedicatedTransaction = transaction
                 };
             }
+
+            /// <inheritdoc />
+            public IDisposable Lock(string resource, TimeSpan timeout) => this.owner.lockedResources.Lock(resource, timeout);
 
             /// <inheritdoc />
             public void Commit() => this.dedicatedTransaction?.Commit();

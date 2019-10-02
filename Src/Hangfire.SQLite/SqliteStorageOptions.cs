@@ -2,6 +2,8 @@
 {
     using System;
 
+    using Hangfire.Sqlite.Concurrency;
+
     /// <summary>
     /// Configuration options for a SQLite storage.
     /// </summary>
@@ -44,5 +46,9 @@
         /// Gets or sets the limits of items displayed on monitoring dashboard per page.
         /// </summary>
         public int? DashboardJobListLimit { get; set; }
+
+        public TimeSpan JobExpirationCheckInterval { get; set; }
+
+        internal Func<ILockedResources> LockedResources { get; set; } = () => new LockedResources();
     }
 }

@@ -5,7 +5,6 @@
     using System.Globalization;
 
     using Hangfire.Common;
-    using Hangfire.Sqlite.Concurrency;
     using Hangfire.Sqlite.Db;
     using Hangfire.Sqlite.Queues;
     using Hangfire.States;
@@ -20,23 +19,18 @@
 
         private readonly Queue<Action> afterCommitCommandQueue = new Queue<Action>();
 
-        private readonly Queue<Func<ILockedResources, IDisposable>> pendingLocks =
-            new Queue<Func<ILockedResources, IDisposable>>();
+        private readonly Queue<Func<ISession, IDisposable>> pendingLocks =
+            new Queue<Func<ISession, IDisposable>>();
 
         private readonly IJobStorage storage;
 
-        private readonly ILockedResources lockedResources;
-
-        public SqliteWriteOnlyTransaction(IJobStorage storage, ILockedResources lockedResources)
-        {
+        public SqliteWriteOnlyTransaction(IJobStorage storage) =>
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
-            this.lockedResources = lockedResources ?? throw new ArgumentNullException(nameof(lockedResources));
-        }
 
         /// <inheritdoc />
         public override void Commit()
         {
-            using (this.lockedResources.LockAll(this.pendingLocks))
+            using (this.storage.LockAll(this.pendingLocks))
             {
                 using (ITransaction transaction = this.storage.BeginTransaction())
                 {
